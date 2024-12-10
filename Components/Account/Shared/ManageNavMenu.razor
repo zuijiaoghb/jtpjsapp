@@ -1,0 +1,27 @@
+﻿@using Microsoft.AspNetCore.Identity
+@using jtpjsapp.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+
+<FluentNavMenu Collapse="false">
+    <FluentNavLink Href="Account/Manage" Match="NavLinkMatch.All">简介</FluentNavLink>
+    <FluentNavLink Href="Account/Manage/Email">邮箱</FluentNavLink>
+    <FluentNavLink Href="Account/Manage/ChangePassword">密码</FluentNavLink>
+    @if (hasExternalLogins)
+    {
+        <FluentNavLink Href="Account/Manage/ExternalLogins">External logins</FluentNavLink>
+    }
+    <FluentNavLink Href="Account/Manage/TwoFactorAuthentication">双重身份验证</FluentNavLink>
+    <FluentNavLink Href="Account/Manage/PersonalData">个人数据</FluentNavLink>
+
+</FluentNavMenu>
+
+
+@code {
+    private bool hasExternalLogins;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
+    }
+}

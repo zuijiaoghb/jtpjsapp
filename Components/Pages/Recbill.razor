@@ -1,0 +1,649 @@
+@page "/recbill"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@implements IDisposable
+@inject ILogger<RecBillModel> Logger
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject IAuthorizationService AuthorizationService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>应收票据</PageTitle>
+ <FluentStack>
+ <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent" Disabled="@adddisabled"  OnClick="@addRecbillAsync" >新增母票</FluentButton>
+    <FluentTextField  @bind-Value="ticketNumberOption"  Required="true"   Label="票号：" Minlength="1" Maxlength="50">    </FluentTextField>
+    <FluentTextField  @bind-Value="subTicketNumberOption"  Required="true"   Label="子票号：" Minlength="1" Maxlength="50">    </FluentTextField>
+ <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent" Disabled="@finddisabled"  OnClick="@FindRecBillByTicketNumberAndSubTicketNumber" >查询母票/子票</FluentButton>
+ <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent" Disabled="@modifydisabled" OnClick="@modifyRecbllByTicketNumberAndSubTicketNumberAndId">修改</FluentButton>
+ <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent" Disabled="@deletedisabled" OnClick="@deleteRecbllByTicketNumberAndSubTicketNumberAndId" >删除</FluentButton>
+ </FluentStack>
+<h1 style="text-align: center">应收票据</h1>
+<EditForm  Model="recbill" OnValidSubmit="Submit" FormName="Recbill1">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+  <FluentGrid Spacing="1" >
+    <FluentGridItem lg="4">
+         <FluentSelect TOption="RecbillCompany"
+               Items=@(Enum.GetValues<RecbillCompany>() )
+	       Placeholder="选择单位..."
+               OptionText="@(i => Enum.GetName(i))"
+               OptionValue="@(i => ((int)(i)).ToString() )"              	                       
+	       @bind-Value="@recbillCompany"
+	       @bind-SelectedOption="@recbill.Company"
+               Label="所属单位："
+               Disabled="@formdisabled"
+               Required="false" />
+     </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+        收票日期:
+        <br/>
+       @* <FluentDatePicker  @bind-Value="recbill.RecDate" @bind-PickerMonth="recbill.RecDate" /> *@
+       <InputDate  @bind-Value="recbill.RecDate"  Disabled="@formdisabled"  />
+    </FluentLabel>
+    </FluentGridItem>
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.RecVoucher" Required="true"   Label="收票凭证号:" Minlength="1" Maxlength="16"   Disabled="@formdisabled" >
+    </FluentTextField>
+    </FluentGridItem>
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.EntryName"  Required="true"   Label="项目名称（即前手单位）：" Minlength="1" Maxlength="50"  Disabled="@formdisabled" >
+    </FluentTextField>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentSelect Items=@recBillCategoryOptions
+               OptionText="@(i => i.Text)"
+               OptionValue="@(i => i.Value)"
+               OptionSelected="@(i => i.Selected)"
+               @bind-Value="@recbill.RecBillCategory"
+               Label="应收票据类别："
+               Disabled="@formdisabled"
+               Required="false" />
+    </FluentGridItem>
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.FrontRela"  Required="true"   Label="与前手的关系：" Minlength="1" Maxlength="16"  Disabled="@formdisabled" >    </FluentTextField>
+    </FluentGridItem>
+    <FluentGridItem lg="4">
+         <FluentSelect Items=@newGenerationOptions
+               OptionText="@(i => i.Text)"
+               OptionValue="@(i => i.Value)"
+               OptionSelected="@(i => i.Selected)"
+               @bind-Value="@recbill.NewGeneration"
+               Label="新一代："
+               Disabled="@formdisabled"
+               Required="false" />
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.TicketNumber"  Required="true"   Label="票号：" Minlength="1" Maxlength="50"  Disabled="@formdisabled" >    </FluentTextField>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.SubTicketNumber"  Required="true"   Label="子票号：" Minlength="1" Maxlength="50"  Disabled="@formdisabled" >    </FluentTextField>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.IssuingUnit"  Required="true"   Label="出票单位：" Minlength="1" Maxlength="50"  Disabled="@formdisabled" >    </FluentTextField>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.AcceptorName"  Required="true"   Label="承兑人名称：" Minlength="1" Maxlength="50"  Disabled="@formdisabled" >    </FluentTextField>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+         <FluentSelect Items=@is69Options
+               OptionText="@(i => i.Text)"
+               OptionValue="@(i => i.Value)"
+               OptionSelected="@(i => i.Selected)"
+               @bind-Value="@recbill.Is69"
+               Label="是否为6+9："
+               Disabled="@formdisabled"
+               Required="false" />
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+    承兑金额：
+    <br/>
+    <InputNumber  @bind-Value="recbill.AcceptAmount"  Disabled="@formdisabled" />
+    </FluentLabel>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+    余额：
+    <br/>
+    <InputNumber  @bind-Value="recbill.Balance"  Disabled="@childdisabled" />
+    </FluentLabel>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+    转出金额：
+    <br/>
+    <InputNumber  @bind-Value="recbill.TransferAmount"  Disabled="@childdisabled" />
+    </FluentLabel>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+        出票日:
+        <br/>
+       @* <FluentDatePicker  @bind-Value="recbill.RecDate" @bind-PickerMonth="recbill.RecDate" /> *@
+       <InputDate  @bind-Value="recbill.TicketIssueDate"  Disabled="@formdisabled" />
+    </FluentLabel>
+    </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentLabel>
+        到期日:
+        <br/>
+       @* <FluentDatePicker  @bind-Value="recbill.RecDate" @bind-PickerMonth="recbill.RecDate" /> *@
+       <InputDate  @bind-Value="recbill.DueDate"  Disabled="@formdisabled"  />
+    </FluentLabel>
+   </FluentGridItem>
+
+    <FluentGridItem lg="4">
+    <FluentTextField  @bind-Value="recbill.Endorser"   Label="背书人："  Maxlength="100"  Disabled="@childdisabled" >
+    </FluentTextField>
+    </FluentGridItem>    
+
+   <FluentGridItem lg="4">
+    <FluentLabel>
+        新建时间:
+        <br/>
+       @* <FluentDatePicker  @bind-Value="recbill.RecDate" @bind-PickerMonth="recbill.RecDate" /> *@
+       <InputDate  @bind-Value="recbill.AddTime"  Disabled="@foreverdisabled"  />
+    </FluentLabel>
+   </FluentGridItem>
+
+   <FluentGridItem lg="4">
+    <FluentLabel>
+        修改时间:
+        <br/>
+       @* <FluentDatePicker  @bind-Value="recbill.RecDate" @bind-PickerMonth="recbill.RecDate" /> *@       <InputDate  @bind-Value="recbill.ModifyTime"  Disabled="@foreverdisabled"  />
+    </FluentLabel>
+   </FluentGridItem>
+
+    <FluentGridItem lg="4">
+         <FluentSelect Items=@isMotherTicketOptions
+               OptionText="@(i => i.Text)"
+               OptionValue="@(i => i.Value)"
+               OptionSelected="@(i => i.Selected)"
+               @bind-Value="@recbill.IsMotherTicket"
+               Label="母票/子票："
+               Disabled="@foreverdisabled"
+               Required="true" />
+    </FluentGridItem>   
+  
+    </FluentGrid>
+    <br/>
+  @* <button type="submit">提交</button> *@
+   <FluentButton Type="ButtonType.Submit" Disabled="@submitdisabled"  Appearance="Appearance.Accent">保存</FluentButton>
+    <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent" Disabled="@cansledisabled" OnClick="@cansleSubmit" >取消</FluentButton>
+
+</EditForm>
+
+
+@*
+<div role="status" style="padding-bottom: 1em;">
+    Current count: <FluentBadge Appearance="Appearance.Neutral">@currentCount</FluentBadge>
+</div>
+
+<FluentButton Appearance="Appearance.Accent" @onclick="IncrementCount">Click me</FluentButton>
+*@
+
+@code {
+        private ApplicationDbContext? Context { get; set; }
+        private bool Busy;
+
+    private int currentCount = 0;
+    private bool adddisabled = false;
+    private bool finddisabled = false;
+    private bool modifydisabled = true;
+    private bool deletedisabled = true;
+    private bool submitdisabled = true;
+    private bool cansledisabled = true;
+    private bool formdisabled = true;
+    private bool ismodifybutton = false;
+    private bool foreverdisabled = true;
+    private bool motherdisabled = true;
+    private bool childdisabled = true;
+
+    private string ticketNumberOption;
+    private string subTicketNumberOption;
+
+    private string recbillCompany;
+        
+
+   // [SupplyParameterFromForm]
+    private RecBillModel recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+
+    static List<Option<string>> recBillCategoryOptions = new()
+    {
+        { new Option<string> { Value = "电子银行承兑汇票", Text = "电子银行承兑汇票" } },
+        { new Option<string> { Value = "其他", Text = "其他" } }
+    };
+
+    static List<Option<string>> newGenerationOptions = new()
+    {
+        { new Option<string> { Value = "是", Text = "是" } },
+        { new Option<string> { Value = "否", Text = "否" } }
+    };
+
+    static List<Option<string>> is69Options = new()
+    {
+        { new Option<string> { Value = "是", Text = "是" } },
+        { new Option<string> { Value = "否", Text = "否" } }
+    };
+    
+    /*
+    static List<Option<string>> companyOptions = new()
+    {
+        { new Option<string> { Value = "1", Text = "江特电机" } },
+        { new Option<string> { Value = "2", Text = "江西江特" } },
+	{ new Option<string> { Value = "3", Text = "银锂新能源" } },
+	{ new Option<string> { Value = "4", Text = "杭州米格" } },
+	{ new Option<string> { Value = "5", Text = "天津华兴" } },
+	{ new Option<string> { Value = "6", Text = "宜丰锂业" } },
+	{ new Option<string> { Value = "7", Text = "泰昌矿业" } },
+	{ new Option<string> { Value = "8", Text = "江特电动车" } },
+	 { new Option<string> { Value = "9", Text = "江特客车厂" } },
+	 { new Option<string> { Value = "10", Text = "江特节能公司" } },
+	 { new Option<string> { Value = "11", Text = "江特高新装备公司" } },
+	 { new Option<string> { Value = "12", Text = "江特高新武汉分公司" } }
+    };
+    */
+  
+
+    static List<Option<string>> isMotherTicketOptions = new()
+    {
+        { new Option<string> { Value = "母票", Text = "母票" } },
+        { new Option<string> { Value = "子票", Text = "子票" } }
+    };
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+	
+	protected override async Task OnInitializedAsync()
+   {
+		  Busy = true;
+
+		  Context = DbFactory.CreateDbContext();
+
+		  Busy = false;
+
+   await base.OnInitializedAsync();
+	   // ... 其他初始化代码
+           recbillCompany = "1";
+           recbill.Company = RecbillCompany.江西江特;
+	   recbill.RecBillCategory = "电子银行承兑汇票";
+           recbill.NewGeneration = "是";
+           recbill.Is69 = "是";
+   }	
+
+    private  async Task  addRecbillAsync(){
+	var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+	recbill.OwnerID = UserManager.GetUserId(user);
+	var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Create);	
+	if (!isAuthorized.Succeeded)
+        {
+            //return Forbid();
+	   var dialog = await DialogService.ShowErrorAsync("当前用户没有新建权限。" );
+           var result = await dialog.Result;
+        } else {	
+        formdisabled = false;
+        submitdisabled = false;
+        cansledisabled = false;
+        ismodifybutton = false;
+        modifydisabled = true;
+        deletedisabled = true;
+        finddisabled = true;
+        recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now , DateTime.Now, DateTime.Now );	      
+        recbillCompany = "1";
+        recbill.Company = RecbillCompany.江西江特;
+        recbill.RecBillCategory = "电子银行承兑汇票";
+        recbill.NewGeneration = "是";
+        recbill.Is69 = "是"; 
+     }
+    }
+
+    private  void cansleSubmit(){
+        if (ismodifybutton == false ) {
+        formdisabled = true;
+        submitdisabled = true;
+        cansledisabled = true;
+        modifydisabled = true;
+        deletedisabled = true;
+        finddisabled = false;
+        recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);     
+        }
+
+        if (ismodifybutton == true ) {
+        formdisabled = true;
+        submitdisabled = true;
+        cansledisabled = true;
+        modifydisabled = false;
+        deletedisabled = false;
+        finddisabled = false;
+        }
+    }
+
+    private async Task  modifyRecbllByTicketNumberAndSubTicketNumberAndId(){
+	var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Update);
+        if (!isAuthorized.Succeeded)
+        {
+           // return Forbid();
+           var dialog = await DialogService.ShowErrorAsync("当前用户没有修改权限。" );
+           var result = await dialog.Result;	   
+        } else {
+        formdisabled = false;
+        submitdisabled = false;
+        cansledisabled =false;
+        ismodifybutton = true;
+        modifydisabled = true;
+        deletedisabled = true;
+        finddisabled = true;
+	Busy = false;
+      }
+  
+    }
+
+   private async Task  deleteRecbllByTicketNumberAndSubTicketNumberAndId() {
+       var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();        
+       var user = authState.User;       
+
+       var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Delete);
+       if (!isAuthorized.Succeeded)
+       {
+               // return Forbid();
+               var dialog = await DialogService.ShowErrorAsync("当前用户没有删除该数据权限。" );
+               var result = await dialog.Result;
+       } else {            
+
+       if (Busy) {
+            return;
+        }
+	
+	    Busy = true;
+        var dialog1 = await DialogService.ShowConfirmationAsync("确认删除吗?", "是", "否", "再次确认");
+        var result1 = await dialog1.Result;
+        bool canceled = result1.Cancelled;
+
+        if (canceled == false) {
+            int count = 0 ;
+
+            try {
+                 var recb = Context.RecBillModels.Single(b => b.TicketNumber == recbill.TicketNumber && b.SubTicketNumber== recbill.SubTicketNumber && b.Id==recbill.Id);
+                 Context.RecBillModels.Remove(recb);
+                 count = Context.SaveChanges();
+            } catch (Microsoft.EntityFrameworkCore.DbUpdateException e ) {
+                var dialog = await DialogService.ShowErrorAsync("删除失败!该票据不存在。" );
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+				Busy = false;
+             }
+             if (count>0) {
+                var dialog = await DialogService.ShowSuccessAsync("删除成功！");
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+               submitdisabled = true;
+               cansledisabled = true;
+                modifydisabled = true;
+                deletedisabled = true;
+                recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+				
+				Busy = false;
+             }
+        }
+
+        if (canceled == true) {
+              submitdisabled = true;
+              cansledisabled = true;
+        }
+		
+		Busy = false;
+     }
+   }
+
+    private async Task  Submit()
+    {         
+			  
+        Logger.LogInformation("收票日期 = {RecDate}", recbill?.RecDate);
+
+        if (ismodifybutton == false) {
+            if (Busy) {
+ 		return;
+            }
+            Busy = true;
+
+	    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            recbill.OwnerID = UserManager.GetUserId(user);	  
+
+            var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Create);
+            if (!isAuthorized.Succeeded)
+            {
+               // return Forbid();
+               var dialog = await DialogService.ShowErrorAsync("当前用户没有新建权限。" );
+               var result = await dialog.Result;
+            } else {           			    
+  
+           int count = 0 ;
+        
+           try {
+            if (recbill.AcceptAmount <= 0)
+            {
+             var dialog = await DialogService.ShowErrorAsync("承兑金额要大于0。" );
+             var result = await dialog.Result;
+            } else {
+		 recbill.Status = RecbillStatus.Submitted;
+		 recbill.Balance = recbill.AcceptAmount;
+		 recbill.IsMotherTicket = "母票";
+                 Context.RecBillModels.Add(recbill); 		 
+                 count = Context.SaveChanges();
+            }
+            } catch (Microsoft.EntityFrameworkCore.DbUpdateException e ) {
+                var dialog = await DialogService.ShowErrorAsync("保存失败!该票据已存在。" );
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+                finddisabled = false;
+                modifydisabled = true;
+                deletedisabled = true;
+               submitdisabled = true;
+               cansledisabled = true;
+                formdisabled = true;
+				Busy = false;
+             }
+             if (count>0) {
+                var dialog = await DialogService.ShowSuccessAsync("保存成功！");
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+                finddisabled = false;
+                modifydisabled = true;
+                deletedisabled = true;
+               submitdisabled = true;
+               cansledisabled = true;
+                formdisabled = true;
+                recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+				Busy = false;
+             }
+	     }
+			 
+			 Busy = false;
+        }
+
+       if (ismodifybutton == true) {
+	    if (Busy) {
+                  return;
+            }            
+	   
+	   Busy = true;
+           int count = 0 ;
+        
+           try {
+            if (recbill.AcceptAmount <= 0)
+            {
+             var dialog = await DialogService.ShowErrorAsync("承兑金额要大于0。" );
+             var result = await dialog.Result;
+            } else {
+		  var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                  var user = authState.User;
+
+                  var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Update);
+                  if (!isAuthorized.Succeeded)
+                  {
+                   // return Forbid();
+                   var dialog = await DialogService.ShowErrorAsync("当前用户没有修改权限。" );
+                   var result = await dialog.Result;
+                  } else {	
+                var recb = Context.RecBillModels.Single(b => b.TicketNumber == recbill.TicketNumber && b.SubTicketNumber== recbill.SubTicketNumber && b.Id==recbill.Id);
+                recb.RecDate = recbill.RecDate;
+                recb.RecVoucher = recbill.RecVoucher;
+                recb.EntryName = recbill.EntryName;
+                recb.RecBillCategory = recbill.RecBillCategory;
+                recb.FrontRela = recbill.FrontRela;
+                recb.NewGeneration = recbill.NewGeneration;
+                recb.IssuingUnit = recbill.IssuingUnit;
+                recb.AcceptorName = recbill.AcceptorName;
+                recb.Is69 = recbill.Is69;
+                recb.AcceptAmount = recbill.AcceptAmount;
+                recb.TicketIssueDate = recbill.TicketIssueDate;
+                recb.DueDate = recbill.DueDate;
+                recb.Company = recbill.Company;
+		recb.ModifyTime = DateTime.Now;
+                 count = Context.SaveChanges();
+               }
+            }
+            } catch (Microsoft.EntityFrameworkCore.DbUpdateException e ) {
+                var dialog = await DialogService.ShowErrorAsync("保存失败。" );
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+	        Busy = false;
+             }
+             if (count>0) {
+                var dialog = await DialogService.ShowSuccessAsync("保存成功！");
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+                submitdisabled = true;
+                cansledisabled = true;
+                modifydisabled = true;
+                deletedisabled = true;
+                finddisabled = false;
+                recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+		Busy = false;
+             }
+			 
+          Busy = false;
+	}
+	 Busy = false;
+    }
+
+
+    private async Task FindRecBillByTicketNumberAndSubTicketNumber()
+    {        
+        if (Busy) {
+            return;
+        }
+		
+		Busy = true;	  
+        modifydisabled = true;
+        deletedisabled = true;                 
+
+           if (ticketNumberOption is null || subTicketNumberOption is null) {
+                var dialog = await DialogService.ShowErrorAsync("查询前请输入票号和子票号。" );
+                var result = await dialog.Result;
+                modifydisabled = true;
+                deletedisabled = true;
+            } else {
+              try {
+	      RecBillModel recb =  Context.RecBillModels.Single(b => b.TicketNumber == ticketNumberOption && b.SubTicketNumber==subTicketNumberOption);
+              recbill.Id=recb.Id;
+              recbill.RecDate=recb.RecDate;
+              recbill.RecVoucher=recb.RecVoucher;
+              recbill.EntryName=recb.EntryName;
+              recbill.RecBillCategory=recb.RecBillCategory;
+              recbill.FrontRela=recb.FrontRela;
+              recbill.NewGeneration=recb.NewGeneration;
+              recbill.TicketNumber=recb.TicketNumber;
+              recbill.SubTicketNumber=recb.SubTicketNumber;
+              recbill.IssuingUnit=recb.IssuingUnit;
+              recbill.AcceptorName=recb.AcceptorName;
+              recbill.Is69=recb.Is69;
+              recbill.AcceptAmount=recb.AcceptAmount;
+              recbill.TicketIssueDate=recb.TicketIssueDate;
+              recbill.DueDate=recb.DueDate;
+              recbill.OwnerID=recb.OwnerID;
+              recbill.Status=recb.Status;
+              recbill.Company=recb.Company;
+	      recbillCompany = ((int)recb.Company).ToString();
+              recbill.Endorser=recb.Endorser;
+              recbill.Balance=recb.Balance;
+              recbill.TransferAmount=recb.TransferAmount;
+              recbill.AddTime=recb.AddTime;
+              recbill.ModifyTime=recb.ModifyTime;
+              recbill.IsMotherTicket=recb.IsMotherTicket;
+	    
+	      var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+              var user = authState.User;
+              var isAuthorized = await AuthorizationService.AuthorizeAsync(
+                                                        user, recbill,
+                                                        RecbillOperations.Read);
+              if (!isAuthorized.Succeeded)
+              {
+                // return Forbid();
+	        recbill = new RecBillModel( DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now );
+                var dialog = await DialogService.ShowErrorAsync("当前用户没有查询该数据的权限。" );      
+                var result = await dialog.Result;
+                recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+              } else {
+                  modifydisabled = false;
+                  deletedisabled = false;
+              }
+            } catch (System.InvalidOperationException e ) {
+                var dialog = await DialogService.ShowErrorAsync("该票据不存在。" );
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+                recbill = new RecBillModel(DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now, DateTime.Now);
+              modifydisabled = true;
+              deletedisabled = true;
+			  Busy = false;
+             }
+          }
+        
+		formdisabled = true;
+		submitdisabled = true;
+		cansledisabled = true;
+		
+		Busy = false;        
+     }
+
+    public void Dispose()
+    {
+       Context?.Dispose();
+    }
+
+}

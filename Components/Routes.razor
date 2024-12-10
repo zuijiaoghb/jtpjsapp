@@ -1,0 +1,21 @@
+﻿@using jtpjsapp.Components.Account.Shared
+@inject NavigationManager NavigationManager
+
+<Router AppAssembly="typeof(Program).Assembly">
+   
+        <Found Context="routeData">	
+	     @if (NavigationManager.Uri.Contains("/Account/Login") || NavigationManager.Uri.Contains("/Account/Register") ) {
+                 <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />                   
+                 <FocusOnNavigate RouteData="routeData" Selector="h1" />
+             } else {
+		  <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">   
+                    <NotAuthorized>
+                         <RedirectToLogin />
+                    </NotAuthorized>
+                 </AuthorizeRouteView>            
+
+                 <FocusOnNavigate RouteData="routeData" Selector="h1" />
+             }
+              
+        </Found>       
+</Router>

@@ -1,0 +1,143 @@
+@implements IDialogContentComponent<RecBillModel>
+@using System.ComponentModel.DataAnnotations
+
+@implements IDisposable
+@inject ILogger<RecBillModel> Logger
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+@* Header *@
+<FluentDialogHeader ShowDismiss="true">
+    <FluentStack VerticalAlignment="VerticalAlignment.Center">
+        <FluentIcon Value="@(new Icons.Regular.Size24.WindowApps())" />
+        <FluentLabel Typo="Typography.PaneHeader">
+            @Dialog.Instance.Parameters.Title
+        </FluentLabel>
+    </FluentStack>
+</FluentDialogHeader>
+
+@* Footer *@
+<FluentDialogFooter>
+    <FluentButton Appearance="Appearance.Accent" OnClick="@SaveAsync">保存</FluentButton>
+    <FluentButton Appearance="Appearance.Neutral" OnClick="@CancelAsync">取消</FluentButton>      
+</FluentDialogFooter>
+
+@* Body *@
+<FluentDialogBody>        
+    <p>当前票据的票据号: @Content.TicketNumber，子票据号:@Content.SubTicketNumber，承兑金额：@Content.AcceptAmount，余额：@Content.Balance。</p>
+    <FluentTextField Name="newSubTicketNumber" @bind-Value="@newSubTicketNumber" Required="true">拆分子票号：</FluentTextField>    
+    <FluentTextField @bind-Value="@Endorser" Required="true">背书人：</FluentTextField>
+    <FluentNumberField @bind-Value="@SplitAcceptAmount" Required="true">转出金额:</FluentNumberField>
+</FluentDialogBody>
+
+@code {
+    private ApplicationDbContext? Context { get; set; }
+    private bool Busy;
+    private int count;
+
+    private decimal SplitAcceptAmount;
+    private string newSubTicketNumber;
+    private string Endorser;
+    public RecBillModel newRecbill = new RecBillModel();
+
+    [Parameter]
+    public RecBillModel Content { get; set; }
+
+    [CascadingParameter]
+    public FluentDialog? Dialog { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+          Busy = true;
+
+          Context = DbFactory.CreateDbContext();
+
+          Busy = false;
+
+        await base.OnInitializedAsync();
+        // ... 其他初始化代码
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Busy) {
+            return;
+        }
+
+        Busy=true;
+        try {
+            if (newSubTicketNumber is null) {
+		var dialog = await DialogService.ShowErrorAsync("拆分子票号必填。" );
+                var result = await dialog.Result;
+            } else if (Endorser is null) {
+                 var dialog = await DialogService.ShowErrorAsync("背书人必填。" );
+                 var result = await dialog.Result;
+            } else if (SplitAcceptAmount > Content.Balance || SplitAcceptAmount<=0 || Content.Balance==0) {
+	         var dialog = await DialogService.ShowErrorAsync("转出金额要小于当前票据余额，且转出金额要大于0，且当前票据余额为0不能拆分。" );
+                 var result = await dialog.Result;
+            } else {
+	           newRecbill.Company = Content.Company;
+                   newRecbill.RecDate = Content.RecDate;
+                   newRecbill.RecVoucher = Content.RecVoucher;
+                   newRecbill.EntryName = Content.EntryName;
+                   newRecbill.RecBillCategory = Content.RecBillCategory;
+                   newRecbill.FrontRela = Content.FrontRela;
+                   newRecbill.NewGeneration = Content.NewGeneration;
+                   newRecbill.TicketNumber = Content.TicketNumber;
+                   newRecbill.SubTicketNumber = newSubTicketNumber;
+                   newRecbill.IssuingUnit = Content.IssuingUnit;
+                   newRecbill.AcceptorName = Content.AcceptorName;
+                   newRecbill.Is69 = Content.Is69;
+                   newRecbill.AcceptAmount = Content.AcceptAmount;
+                   newRecbill.TransferAmount = SplitAcceptAmount;
+	           newRecbill.Balance = Content.Balance - SplitAcceptAmount;                   
+                   newRecbill.TicketIssueDate = Content.TicketIssueDate;                   
+                   newRecbill.DueDate = Content.DueDate;
+                   newRecbill.Endorser = Endorser;
+                   newRecbill.AddTime = DateTime.Now;
+                   newRecbill.ModifyTime = DateTime.Now;
+                   newRecbill.IsMotherTicket = "子票";
+                   newRecbill.OwnerID = Content.OwnerID;
+                   newRecbill.Status = RecbillStatus.Submitted;
+                   Context.RecBillModels.Add(newRecbill);
+                   count = Context.SaveChanges();
+
+                   try {
+                       var recb = Context.RecBillModels.Single(b => b.TicketNumber == Content.TicketNumber && b.SubTicketNumber== Content.SubTicketNumber && b.Id==Content.Id);
+                       recb.Balance = recb.Balance - SplitAcceptAmount;
+                       Content.Balance = recb.Balance - SplitAcceptAmount;
+                       count = Context.SaveChanges();
+                  } catch (Microsoft.EntityFrameworkCore.DbUpdateException e ) {
+                      var dialog = await DialogService.ShowErrorAsync("修改原票据承兑金额失败。" );
+                      var result = await dialog.Result;
+                      //canceled = result.Cancelled;
+                      Busy = false;
+                  }
+            }
+            } catch (Microsoft.EntityFrameworkCore.DbUpdateException e ) {
+                   var dialog = await DialogService.ShowErrorAsync("保存新票据失败!" );
+                   var result = await dialog.Result;
+                   //canceled = result.Cancelled;
+                   Busy = false;
+             }
+             if (count>0) {
+                 var dialog = await DialogService.ShowSuccessAsync("拆分成功！");
+                 var result = await dialog.Result;
+                 //canceled = result.Cancelled;
+                 Busy = false;
+              }
+
+        await Dialog.CloseAsync(Content);
+    }
+
+    private async Task CancelAsync()
+    {
+        await Dialog.CancelAsync();
+    }
+
+    public void Dispose()
+    {
+        // Context?.Dispose();
+   }
+}

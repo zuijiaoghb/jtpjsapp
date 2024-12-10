@@ -1,0 +1,60 @@
+﻿
+
+@implements IDisposable
+
+@inject NavigationManager NavigationManager
+
+<div class="navmenu">
+    <input type="checkbox" title="Menu expand/collapse toggle" id="navmenu-toggle" class="navmenu-icon" />
+    <label for="navmenu-toggle" class="navmenu-icon"><FluentIcon Value="@(new Icons.Regular.Size20.Navigation())" Color="Color.Fill" /></label>
+    <nav class="sitenav" aria-labelledby="main-menu">
+        <FluentNavMenu Id="main-menu" Collapsible="true" Width="250" Title="Navigation menu" @bind-Expanded="expanded" CustomToggle="true">
+           @* <FluentNavLink Href="/" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.Home())" IconColor="Color.Accent">首页</FluentNavLink>
+            <FluentNavLink Href="counter" Icon="@(new Icons.Regular.Size20.NumberSymbolSquare())" IconColor="Color.Accent">Counter</FluentNavLink> 
+            <FluentNavLink Href="weather" Icon="@(new Icons.Regular.Size20.WeatherPartlyCloudyDay())" IconColor="Color.Accent">Weather</FluentNavLink>  *@
+          @*  <FluentNavLink Href="auth" Icon="@(new Icons.Regular.Size20.LockClosedKey())" IconColor="Color.Accent">授权登录</FluentNavLink> *@
+            <AuthorizeView>
+                <Authorized>
+                    @*
+                    <FluentNavLink Href="Account/Manage">@context.User.Identity?.Name</FluentNavLink>
+                    <form action="Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <input type="hidden" name="ReturnUrl" value="Account/Login" />
+                        <FluentButton Type="ButtonType.Submit" Style="width: 100%;">注销</FluentButton>
+                    </form>		    
+                    *@
+		    <FluentNavLink Href="recbill" Icon="@(new Icons.Regular.Size20.Money())" IconColor="Color.Accent">应收票据</FluentNavLink>
+		    <FluentNavLink Href="motherRecbilllist" Icon="@(new Icons.Regular.Size20.List())"  IconColor="Color.Accent">应收票据母票列表</FluentNavLink>
+	            <FluentNavLink Href="childRecbilllist" Icon="@(new Icons.Regular.Size20.TicketHorizontal())"  IconColor="Color.Accent">应收票据子票列表</FluentNavLink>
+                </Authorized>
+                <NotAuthorized>
+                    <FluentNavLink Href="Account/Register">注册</FluentNavLink>
+                    <FluentNavLink Href="Account/Login">登录</FluentNavLink>
+                </NotAuthorized>
+            </AuthorizeView>    
+        </FluentNavMenu>
+    </nav>
+</div>
+
+@code {
+    private bool expanded = true;
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

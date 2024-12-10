@@ -1,0 +1,33 @@
+{
+  "Files": [
+    {
+      "Id": "/opt/aspnetcore/jtpjsapp/wwwroot/app.css",
+      "PackagePath": "staticwebassets/app.css"
+    },
+    {
+      "Id": "/opt/aspnetcore/jtpjsapp/wwwroot/favicon.ico",
+      "PackagePath": "staticwebassets/favicon.ico"
+    },
+    {
+      "Id": "/opt/aspnetcore/jtpjsapp/wwwroot/票据系统背景图.jpg",
+      "PackagePath": "staticwebassets/票据系统背景图.jpg"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.jtpjsapp.props",
+      "PackagePath": "build\\jtpjsapp.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.jtpjsapp.props",
+      "PackagePath": "buildMultiTargeting\\jtpjsapp.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.jtpjsapp.props",
+      "PackagePath": "buildTransitive\\jtpjsapp.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.jtpjsapp.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

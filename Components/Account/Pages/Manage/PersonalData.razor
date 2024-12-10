@@ -1,0 +1,37 @@
+﻿@page "/Account/Manage/PersonalData"
+
+@inject IdentityUserAccessor UserAccessor
+
+<PageTitle>个人数据</PageTitle>
+
+<StatusMessage />
+<h3>个人数据</h3>
+
+<FluentGrid>
+    <FluentGridItem xs="12" sm="6">
+        <p>你的账号包含已给的个人数据，此页允许你下载或删除。</p>
+        <p>
+            <strong>删除你的账号后，无法恢复。</strong>
+        </p>
+        <form action="Account/Manage/DownloadPersonalData" method="post">
+            <AntiforgeryToken />
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Style="width:20%;">下载</FluentButton>
+        </form>
+        
+        <hr />
+        
+        <p>
+            <FluentAnchor Href="Account/Manage/DeletePersonalData" Style="width:20%;">删除</FluentAnchor>
+        </p>
+    </FluentGridItem>
+</FluentGrid>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ = await UserAccessor.GetRequiredUserAsync(HttpContext);
+    }
+}

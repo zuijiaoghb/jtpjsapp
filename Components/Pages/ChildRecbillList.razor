@@ -1,0 +1,233 @@
+@page "/childRecbilllist"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@implements IDisposable
+@inject ILogger<RecBillModel> Logger
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject IAuthorizationService AuthorizationService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>应收票据子票列表</PageTitle>
+<h2>查询条件:</h2>
+<FluentGrid Spacing="1" >
+<FluentGridItem lg="2">
+    <FluentLabel>
+        收票日期:
+        <br/>
+        开始： <InputDate  @bind-Value="recbilllistRecDateStart" Size="20" />
+        <br/>
+        结束： <InputDate  @bind-Value="recbilllistRecDateEnd" Size="20" />
+    </FluentLabel>
+</FluentGridItem>
+<FluentGridItem lg="2">
+    <FluentTextField  @bind-Value="recbilllistIssuingUnit"    Label="出票单位：" Minlength="1" Maxlength="50"   >    </FluentTextField>
+</FluentGridItem>
+<FluentGridItem lg="2">
+    <FluentTextField  @bind-Value="recbilllistAcceptorName"   Label="承兑人名称：" Minlength="1" Maxlength="50"  >    </FluentTextField>
+</FluentGridItem>
+<FluentGridItem lg="2">
+    <FluentTextField  @bind-Value="recbilllistTicketNumber"     Label="票号：" Minlength="1" Maxlength="50">    </FluentTextField>
+</FluentGridItem>
+<FluentGridItem lg="2">
+    <FluentTextField  @bind-Value="recbilllistSubTicketNumber"     Label="子票号：" Minlength="1" Maxlength="50">    </FluentTextField>
+</FluentGridItem>
+<FluentGridItem lg="2">
+    <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent"  OnClick="@FindRecbillList" >查询</FluentButton>   
+    <FluentButton Type="ButtonType.Button"  Appearance="Appearance.Accent"  OnClick="@ExportExcelAsync" >导出excel</FluentButton>
+</FluentGridItem>
+</FluentGrid>
+<h1 style="text-align: center">应收票据子票列表</h1>
+
+<div style="display: table; table-layout: fixed; width: 100%;">
+<div style="overflow-x: auto;">
+<FluentDataGrid Items="@recbills.AsQueryable()"  TGridItem="RecBillModel"  ResizableColumns="true"
+
+                Pagination="@pagination" ShowHover="true"
+>
+    @*
+    <TemplateColumn Tooltip="true" TooltipText="@(c => "拆分票据号： " + c.TicketNumber+"+" + c.SubTicketNumber)" Title="功能" Width="100px" Align="Align.Center" InitialSortDirection="SortDirection.Ascending" IsDefaultSortColumn=true>
+        <FluentButton Type="ButtonType.Button" Appearance="Appearance.Accent" OnClick="@SplitRecbillAsync">拆分</FluentButton>
+    </TemplateColumn>
+   *@
+    <SelectColumn TGridItem="RecBillModel"
+                  SelectMode="DataGridSelectMode.Single"
+                  SelectFromEntireRow="true"
+                  @bind-SelectedItems="@SelectedItems" />
+    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Title="序号" Width="60px" Align="Align.Center"  Tooltip="true"  />
+    <PropertyColumn Property="@(p => p.Company)"  Sortable="true"  Title="所属单位"  Width="180px" Align="Align.Center" Tooltip="true"/>
+    <PropertyColumn Property="@(p => p.RecDate)" Format="yyyy-MM-dd" Sortable="true"  Title="收票 日期"  Width="120px" Align="Align.Center" Tooltip="true" />
+    <PropertyColumn Property="@(p => p.RecVoucher)"  Sortable="true"  Title="收票凭证号"  Width="140px" Align="Align.Center" Tooltip="true" />
+        <PropertyColumn Property="@(p => p.EntryName)"  Sortable="true"  Title="项目名称（即前手单位）"  Width="250px" Align="Align.Center" Tooltip="true" />
+        <PropertyColumn Property="@(p => p.RecBillCategory)"  Sortable="true"  Title="应收票据类别"  Width="180px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.FrontRela)"  Sortable="true"  Title="与前手的关系"  Width="180px" Align="Align.Center" Tooltip="true" />
+        <PropertyColumn Property="@(p => p.NewGeneration)"  Sortable="true"  Title="新一代"  Width="80px" Align="Align.Center" Tooltip="true" />
+        <PropertyColumn Property="@(p => p.TicketNumber)"  Sortable="true"  Title="票号" Width="260px"  Align="Align.Center"  Tooltip="true" />
+        <PropertyColumn Property="@(p => p.SubTicketNumber)"  Sortable="true"  Title="子票号"  Width="240px" Align="Align.Center"  Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.IssuingUnit)"  Sortable="true"  Title="出票单位"  Width="240px" Align="Align.Center"  Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.AcceptorName)"  Sortable="true"  Title="承兑人名称"  Width="240px" Align="Align.Center"  Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.Is69)"  Sortable="true"  Title="是否6+9"  Width="100px" Align="Align.Center"  Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.AcceptAmount)"  Sortable="true"  Title="承兑金额"  Width="160px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.Balance)"  Sortable="true"  Title="余额"  Width="160px" Align="Align.Center" Tooltip="true"/>
+	<PropertyColumn Property="@(p => p.TransferAmount)"  Sortable="true"  Title="转出金额"  Width="160px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.TicketIssueDate)"  Format="yyyy-MM-dd"  Sortable="true"  Title="出票日"  Width="120px" Align="Align.Center"  Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.DueDate)"  Format="yyyy-MM-dd"  Sortable="true"  Title="到期日"  Width="120px" Align="Align.Center" Tooltip="true"/>
+	<PropertyColumn Property="@(p => p.Endorser)"   Sortable="true"  Title="背书人"  Width="160px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.AddTime)"  Format="yyyy-MM-dd"  Sortable="true"  Title="新建时间"  Width="120px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.ModifyTime)"  Format="yyyy-MM-dd"  Sortable="true"  Title="修改时间"  Width="120px" Align="Align.Center" Tooltip="true"/>
+        <PropertyColumn Property="@(p => p.IsMotherTicket)"  Sortable="true"  Title="母票/子票"  Width="100px" Align="Align.Center" Tooltip="true"/>
+</FluentDataGrid>
+</div>
+</div>
+
+<FluentPaginator State="@pagination" />
+
+@code {
+        private ApplicationDbContext? Context { get; set; }
+        private bool Busy;
+
+        //private IQueryable<RecBillModel> recbills;
+        private List<RecBillModel> recbills;
+        PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+        IEnumerable<RecBillModel> SelectedItems;
+
+        private DateTime recbilllistRecDateStart = DateTime.Now;
+        private DateTime recbilllistRecDateEnd = DateTime.Now;
+        private string recbilllistTicketNumber;
+        private string recbilllistSubTicketNumber;
+        private string recbilllistIssuingUnit;
+        private string recbilllistAcceptorName;
+
+        protected override async Task OnInitializedAsync()
+       {
+              Busy = true;
+
+              Context = DbFactory.CreateDbContext();
+              recbills  = Context.RecBillModels
+                                                .Where(r => (recbilllistRecDateStart != DateTime.MinValue&& recbilllistRecDateEnd != DateTime.MinValue  && r.RecDate.Date >= recbilllistRecDateStart.Date  && r.RecDate.Date<= recbilllistRecDateEnd.Date) &&
+                                                             (!string.IsNullOrEmpty(recbilllistTicketNumber) ? r.TicketNumber==recbilllistTicketNumber : true ) &&
+                                                             (!string.IsNullOrEmpty(recbilllistSubTicketNumber) ? r.SubTicketNumber==recbilllistSubTicketNumber : true) &&
+                                                             (!string.IsNullOrEmpty(recbilllistIssuingUnit) ? r.IssuingUnit==recbilllistIssuingUnit : true) &&
+                                                             (!string.IsNullOrEmpty(recbilllistAcceptorName) ? r.AcceptorName==recbilllistAcceptorName : true) && r.IsMotherTicket=="子票" ).ToList();
+              
+              var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+              var user = authState.User;
+
+	      var isAuthorized = user.IsInRole(Recbills.RecbillManagersRole) ||
+                                 user.IsInRole(Recbills.RecbillAdministratorsRole);             
+
+              var currentUserId = UserManager.GetUserId(user);
+
+	      if (!isAuthorized)
+              {
+                  recbills = recbills.Where(r => r.Status == RecbillStatus.Approved
+                                            || r.OwnerID == currentUserId).ToList();
+              }
+
+             SelectedItems = recbills.AsQueryable().Where(p => p.Selected).ToList().AsQueryable();
+
+            Busy = false;
+
+       await base.OnInitializedAsync();
+           // ... 其他初始化代码
+       }
+
+        private async Task FindRecbillList() {
+              if (Busy) {
+                  return;
+              }
+
+              Busy = true;
+              try {
+                  recbills = Context.RecBillModels
+                                                 .Where(r => (recbilllistRecDateStart != DateTime.MinValue&& recbilllistRecDateEnd != DateTime.MinValue  && r.RecDate.Date >= recbilllistRecDateStart.Date  && r.RecDate.Date<= recbilllistRecDateEnd.Date) &&
+                                                             (!string.IsNullOrEmpty(recbilllistTicketNumber) ? r.TicketNumber==recbilllistTicketNumber : true ) &&
+                                                             (!string.IsNullOrEmpty(recbilllistSubTicketNumber) ? r.SubTicketNumber==recbilllistSubTicketNumber : true) &&
+                                                             (!string.IsNullOrEmpty(recbilllistIssuingUnit) ? r.IssuingUnit==recbilllistIssuingUnit : true) &&
+                                                             (!string.IsNullOrEmpty(recbilllistAcceptorName) ? r.AcceptorName==recbilllistAcceptorName : true) && r.IsMotherTicket=="子票" ).ToList();
+
+	      var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+              var user = authState.User;
+	      
+              var isAuthorized = user.IsInRole(Recbills.RecbillManagersRole) ||
+                                 user.IsInRole(Recbills.RecbillAdministratorsRole);
+              var currentUserId = UserManager.GetUserId(user);
+
+	      if (!isAuthorized)
+              {
+                  recbills = recbills.Where(r => r.Status == RecbillStatus.Approved
+                                            || r.OwnerID == currentUserId).ToList();
+              }
+            } catch (System.InvalidOperationException e ) {
+                var dialog = await DialogService.ShowErrorAsync("查询票据列表异常。" );
+                var result = await dialog.Result;
+                //canceled = result.Cancelled;
+                Busy = false;
+             }
+
+            Busy = false;
+        }
+
+       private Stream GetFileStream()
+       {
+        var randomBinaryData = new byte[50 * 1024];
+        var fileStream = new MemoryStream(randomBinaryData);
+
+        return fileStream;
+       } 
+
+       private async Task ExportExcelAsync() {
+         using var workbook = new XLWorkbook();
+         var worksheet = workbook.AddWorksheet("应收票据子票列表");
+         worksheet.ColumnWidth = 12;
+         //worksheet.Cell("A1").Value = "Hello World!";
+         //worksheet.Cell("A2").FormulaA1 = "MID(A1, 7, 5)";
+         worksheet.Cell("A1").InsertTable(recbills);
+         worksheet.Cell("A1").Value = "序号";
+         worksheet.Cell("B1").Value = "收票日期";
+         worksheet.Cell("C1").Value = "收票凭证号";
+         worksheet.Cell("D1").Value = "项目名称（即前手单位）";
+         worksheet.Cell("E1").Value = "应收票据类别";
+         worksheet.Cell("F1").Value = "与前手的关系";
+         worksheet.Cell("G1").Value = "新一代";
+         worksheet.Cell("H1").Value = "票号";
+         worksheet.Cell("I1").Value = "子票号";
+         worksheet.Cell("J1").Value = "出票单位";
+         worksheet.Cell("K1").Value = "承兑人名称";
+         worksheet.Cell("L1").Value = "是否6+9";
+         worksheet.Cell("M1").Value = "承兑金额";
+         worksheet.Cell("N1").Value = "出票日";
+         worksheet.Cell("O1").Value = "到期日";
+         worksheet.Cell("P1").Value = "是否选中";
+         worksheet.Cell("Q1").Value = "用户ID";
+         worksheet.Cell("R1").Value = "状态";
+         worksheet.Cell("S1").Value = "所属单位";
+         worksheet.Cell("T1").Value = "背书人";
+         worksheet.Cell("U1").Value = "余额";
+         worksheet.Cell("V1").Value = "转出金额";
+         worksheet.Cell("W1").Value = "新建时间";
+         worksheet.Cell("X1").Value = "修改时间";
+         worksheet.Cell("Y1").Value = "母票/子票";
+         worksheet.Columns().AdjustToContents();
+         //workbook.SaveAs("/opt/aspnetcore/jtpjsapp/files/export/应收票据母票列表.xlsx");
+
+         var fileStream = GetFileStream();
+         workbook.SaveAs(fileStream);
+         fileStream.Seek(0, SeekOrigin.Begin);
+         var fileName = "应收票据子票列表.xlsx";
+
+         using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+         await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+     }
+
+
+    public void Dispose()
+    {
+         Context?.Dispose();
+    }
+
+}
